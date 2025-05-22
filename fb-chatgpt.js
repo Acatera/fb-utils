@@ -72,9 +72,23 @@
             }
         });
 
-        // --- COPY BUTTONS ---
+        // --- CHECKBOX: Auto-open GPT tab ---
+        let autoOpenGPT = localStorage.getItem('fb_thread_collector_auto_open_gpt') === 'true';
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.style = "margin-right:12px; cursor:pointer; font-size:13px; user-select: none; vertical-align: middle; display: inline-flex; align-items: center;";
+        const checkbox = document.createElement('input');
+        checkbox.type = "checkbox";
+        checkbox.checked = autoOpenGPT;
+        checkbox.style = "margin-right:5px; vertical-align: middle;";
+        checkbox.onchange = function() {
+            autoOpenGPT = checkbox.checked;
+            localStorage.setItem('fb_thread_collector_auto_open_gpt', autoOpenGPT);
+        };
+        checkboxLabel.appendChild(checkbox);
+        checkboxLabel.appendChild(document.createTextNode("Auto-open GPT tab"));
+        panel.appendChild(checkboxLabel);
 
-        // Helper to get post + thread array
+        // --- COPY BUTTONS ---
         function getPostAndThreadArray() {
             const postMessage = document.querySelector('[role="dialog"] div[data-ad-rendering-role="story_message"]');
             let msg = '';
@@ -89,7 +103,7 @@
             return arr;
         }
 
-        // Get Reply button (GPT prompt for writing a reply)
+        // Get Reply button
         const replyBtn = document.createElement('button');
         replyBtn.textContent = 'Get Reply';
         replyBtn.style = 'margin-right:12px;padding:4px 10px;border-radius:5px;background:#3484fa;color:white;border:none;cursor:pointer;font-size:14px;';
@@ -112,9 +126,13 @@
             }
             replyBtn.textContent = 'Copied!';
             setTimeout(() => (replyBtn.textContent = 'Get Reply'), 1200);
+
+            if (autoOpenGPT) {
+                window.open('https://chatgpt.com/?temporary-chat=true&model=gpt-4o', '_blank');
+            }
         };
 
-        // Debunk button (GPT-structured, easy to paste)
+        // Debunk button
         const debunkBtn = document.createElement('button');
         debunkBtn.textContent = 'Debunk';
         debunkBtn.style = 'margin-right:12px;padding:4px 10px;border-radius:5px;background:#c02942;color:white;border:none;cursor:pointer;font-size:14px;';
@@ -122,7 +140,7 @@
             const arr = getPostAndThreadArray();
             const post = arr.length > 0 ? arr[0] : '';
             const threadArr = arr.slice(1);
-            let out = `Fact-check this Facebook post and its comment thread. When generating a reply, do not include any of the comment author names.\n\nPost:\n${post}\n\nThread:`;
+            let out = `Fact-check this Facebook post and its comment thread. After, generate a comment reply in Romanian, not including any of the comment author names.\n\nPost:\n${post}\n\nThread:`;
             if (threadArr.length > 0) {
                 threadArr.forEach((c, i) => {
                     out += `\n${i + 1}. ${c}`;
@@ -137,6 +155,10 @@
             }
             debunkBtn.textContent = 'Copied!';
             setTimeout(() => (debunkBtn.textContent = 'Debunk'), 1200);
+
+            if (autoOpenGPT) {
+                window.open('https://chatgpt.com/?temporary-chat=true&model=gpt-4o', '_blank');
+            }
         };
 
         // Reset button with pill
@@ -197,17 +219,18 @@
         return `Author: ${author}\n${text}`;
     }
 
-    // --- Add "Add Comment" buttons next to each Reply button
+    // --- Add "Add Comment" buttons next to each Reply button (clone style!)
     function addChatGPTButton(replyBtn) {
         // Don’t add again if already present
         if (replyBtn.dataset.hasAddCommentBtn) return;
         replyBtn.dataset.hasAddCommentBtn = "1";
 
-        // Create the Add Comment button
-        const addBtn = document.createElement('button');
+        // Clone the Reply button and adjust for Add Comment
+        const addBtn = replyBtn.cloneNode(true);
         addBtn.textContent = 'Add Comment';
-        addBtn.style = 'margin-left:8px;padding:2px 8px;border-radius:4px;background:#2ecc71;color:white;border:none;cursor:pointer;font-size:13px;';
-
+        addBtn.classList.add('gpt-add-comment-btn');
+        addBtn.style.color = '#31a24c';  // Facebook green
+        addBtn.style.marginLeft = '8px';
         addBtn.onclick = (e) => {
             e.stopPropagation();
             const parsed = parseCommentFromReplyBtn(replyBtn);
@@ -220,7 +243,6 @@
             }
         };
 
-        // Insert after Reply button
         replyBtn.parentNode.insertBefore(addBtn, replyBtn.nextSibling);
     }
 
@@ -243,5 +265,14 @@
     // --- Main
     createPanel();
     observeReplies();
+
+    // --- Extra: Style for Add Comment button hover (optional)
+    const style = document.createElement('style');
+    style.textContent = `
+        .gpt-add-comment-btn:hover, .gpt-add-comment-btn:focus {
+            background: rgba(49,162,76,0.12) !important;
+        }
+    `;
+    document.head.appendChild(style);
 
 })();
