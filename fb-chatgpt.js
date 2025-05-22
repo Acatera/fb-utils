@@ -140,7 +140,7 @@
             const arr = getPostAndThreadArray();
             const post = arr.length > 0 ? arr[0] : '';
             const threadArr = arr.slice(1);
-            let out = `Fact-check this Facebook post and its comment thread. After, generate a comment reply in Romanian, not including any of the comment author names.\n\nPost:\n${post}\n\nThread:`;
+            let out = `Debunk this Facebook post and its comment thread and generate a comment reply in Romanian, not including any of the comment author names. Assume the post author means to spread disinformation and panic.\n\nPost:\n${post}\n\nThread:`;
             if (threadArr.length > 0) {
                 threadArr.forEach((c, i) => {
                     out += `\n${i + 1}. ${c}`;
