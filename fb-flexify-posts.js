@@ -5,6 +5,15 @@
     return;
   }
 
+  // Set feed to 100% width
+  Object.assign(feed.style, {
+    maxWidth: '100%',
+    width: '100%',
+    margin: '0',
+    transform: 'none',
+    zoom: '100%',
+  });
+
   // Walk up the DOM and widen all parent containers
   let parent = feed.parentElement;
   while (parent) {
@@ -41,8 +50,8 @@
   const articles = feed.querySelectorAll('[role="article"]');
   articles.forEach(article => {
     Object.assign(article.style, {
-      flex: '0 1 200px',
-      maxWidth: '300px',
+      flex: '0 1 300px',
+      maxWidth: '350px',
       maxHeight: '250px',
       boxSizing: 'border-box',
       margin: '0'

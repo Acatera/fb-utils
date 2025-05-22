@@ -6,6 +6,7 @@
         for (const container of containers) {
             for (const child of container.children) {
                 // Find the post URL element properly
+                debugger
                 const postUrlElement = Array.from(child.querySelectorAll('a[aria-label][role="link"]'))
                     .find(a => {
                         // Check if the link contains 'story_fbid' and 'id' in the URL, or videos
@@ -13,7 +14,9 @@
                         const hasStoryFbid = url.searchParams.has('story_fbid');
                         const hasId = url.searchParams.has('id');
                         const hasVideo = url.pathname.includes('/videos/');
-                        return (hasStoryFbid && hasId) || hasVideo;
+                        const hasPost = url.pathname.includes('/posts/');
+                        const hasReels = url.pathname.includes('/reels/');
+                        return (hasPost) || (hasStoryFbid && hasId) || hasVideo || hasReels;
                     });
 
                 let postUrl = null;
@@ -23,6 +26,11 @@
                     const id = url.searchParams.get('id');
                     if (storyFbid && id) {
                         url.search = `?story_fbid=${storyFbid}&id=${id}`;
+                        postUrl = url.toString();
+                    }
+                    else if (url.pathname.includes('/posts/')) {
+                        const postId = url.pathname.split('/').pop();
+                        url.search = `?id=${postId}`;
                         postUrl = url.toString();
                     }
                 }
