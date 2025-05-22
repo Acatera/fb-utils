@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Floating Taskbar (with Search Box)
+// @name         FaceBook utils
 // @namespace    http://yourname.dev/
 // @version      1.3
 // @description  Draggable taskbar with search box and buttons for comment tools on Facebook pages, with clean layout and input alignment improvements.
@@ -490,7 +490,13 @@
         console.log('Scrape Top Comments clicked:', counter);
 
         function consumeComment(comment) {
-            comments.push(comment.innerText.trim());
+            // comments.push(comment.innerText.trim());
+
+            const commentObj = parseComment(comment.innerText.trim());
+            if (commentObj && commentObj.message) {
+                comments.push(commentObj);
+            }
+
             const parent = comment.closest('div:not([class])');
             if (parent) {
                 parent.remove();
@@ -501,6 +507,62 @@
                 console.log(`Processed ${comments.length} comments...`);
             }
         }
+
+        function parseComment(comment) {
+            let lines = comment.trim().split('\n').filter(Boolean);
+
+            // Known UI elements and labels to ignore
+            const decorators = ['Top fan', 'Rising fan'];
+            const uiElements = ['Like', 'ReplyAdd Comment', 'Edited'];
+
+            let isAuthor = false;
+            let name = '';
+            let message = '';
+            let time = '';
+            let likeCount = 0;
+
+            // Remove decorator lines (but keep 'Author')
+            while (lines.length && (decorators.includes(lines[0]) || lines[0] === 'Author')) {
+                if (lines[0] === 'Author') {
+                    isAuthor = true;
+                }
+                lines.shift();
+            }
+
+            // Name is usually the next line
+            if (lines.length > 0) {
+                name = lines.shift();
+            }
+
+            // Extract time
+            const timeRegex = /^\d+\s?[mh]$/i;
+            const timeIndex = lines.findIndex(line => timeRegex.test(line.trim()));
+            if (timeIndex !== -1) {
+                time = lines[timeIndex].trim();
+                lines.splice(timeIndex, 1); // remove time from array
+            }
+
+            // Extract like count if present at the end and is a number
+            const lastLine = lines[lines.length - 1];
+            if (/^\d+$/.test(lastLine)) {
+                likeCount = parseInt(lines.pop(), 10);
+            }
+
+            // Filter out UI elements like 'Like', 'ReplyAdd Comment', etc.
+            lines = lines.filter(line => !uiElements.includes(line.trim()));
+
+            // The rest is the message
+            message = lines.join(' ').trim();
+
+            return {
+                isAuthor,
+                name,
+                message,
+                time,
+                likeCount
+            };
+        }
+
 
         function getNextComment() {
             return document.querySelector('div[role="dialog"] div[aria-label^="Comment"][role="article"]');
