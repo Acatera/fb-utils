@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Facebook Thread Collector Panel
+// @name         Facebook ChatGPT
 // @namespace    http://tampermonkey.net/
 // @version      2024.05.22
-// @description  Floating panel for collecting FB comments via adjacent Add Comment buttons, with drag, copy, and reset, plus ready-to-paste GPT prompts
+// @description  Floating panel for collecting FB comments via adjacent Add Comment buttons, with drag, copy, reset, GPT prompts, and highlights
 // @author       You
 // @match        https://www.facebook.com/*
 // @grant        GM_setClipboard
@@ -173,6 +173,7 @@
             thread = [];
             saveThread();
             updatePill();
+            rehighlightAllComments();
         };
 
         // --- Add controls to panel
@@ -185,8 +186,7 @@
     }
 
     // --- Comment parsing (robust against decorators, keeps only main comment)
-    function parseCommentFromReplyBtn(replyBtn) {
-        // Move up 5 parentElements, then first child
+    function extractCommentText(replyBtn) {
         let commentContainer = replyBtn;
         for (let i = 0; i < 5; i++) {
             if (commentContainer.parentElement) {
@@ -196,16 +196,11 @@
             }
         }
         if (!commentContainer || !commentContainer.childNodes || !commentContainer.childNodes[0]) return null;
-        commentContainer = commentContainer.childNodes[0];
-
-        // Use main selector as in your code
-        const commentBlock = commentContainer;
+        const commentBlock = commentContainer.childNodes[0];
         if (!commentBlock) return null;
 
-        // role="link"
         const author = commentBlock.querySelector('a[role="link"]')?.textContent.trim() || 'Unknown';
         const textBlock = commentBlock.innerText.trim();
-        // Strip out decorations and author duplicates
         const text = textBlock
             .split('\n')
             .map(line => line.trim())
@@ -221,7 +216,6 @@
 
     // --- Add "Add Comment" buttons next to each Reply button (clone style!)
     function addChatGPTButton(replyBtn) {
-        // Don’t add again if already present
         if (replyBtn.dataset.hasAddCommentBtn) return;
         replyBtn.dataset.hasAddCommentBtn = "1";
 
@@ -233,11 +227,17 @@
         addBtn.style.marginLeft = '8px';
         addBtn.onclick = (e) => {
             e.stopPropagation();
-            const parsed = parseCommentFromReplyBtn(replyBtn);
+            const parsed = extractCommentText(replyBtn);
             if (parsed) {
+                if (thread.includes(parsed)) {
+                    // Already in thread: scroll & highlight
+                    highlightCommentByText(parsed);
+                    return;
+                }
                 thread.push(parsed);
                 saveThread();
                 updatePill();
+                rehighlightAllComments();
             } else {
                 alert('Could not parse comment.');
             }
@@ -246,12 +246,85 @@
         replyBtn.parentNode.insertBefore(addBtn, replyBtn.nextSibling);
     }
 
+    // --- Re-highlight all comments after DOM changes or thread update
+    function rehighlightAllComments() {
+        const allReplyButtons = Array.from(document.querySelectorAll('div[role="button"]')).filter(el => el.textContent.trim() === 'Reply');
+        for (const replyBtn of allReplyButtons) {
+            let commentContainer = replyBtn;
+            for (let i = 0; i < 5; i++) {
+                if (commentContainer.parentElement) {
+                    commentContainer = commentContainer.parentElement;
+                } else {
+                    continue;
+                }
+            }
+            if (!commentContainer || !commentContainer.childNodes || !commentContainer.childNodes[0]) continue;
+            const commentBlock = commentContainer.childNodes[0];
+            if (!commentBlock) continue;
+
+            const author = commentBlock.querySelector('a[role="link"]')?.textContent.trim() || 'Unknown';
+            const textBlock = commentBlock.innerText.trim();
+            const text = textBlock
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line =>
+                    line &&
+                    line !== author &&
+                    !/^(Top fan|Author|Like|Reply|Just now|\d+[hm]|·)$/.test(line)
+                )
+                .join(' ');
+            const displayText = `Author: ${author}\n${text}`;
+
+            if (thread.includes(displayText)) {
+                commentContainer.classList.add('gpt-comment-highlight');
+            } else {
+                commentContainer.classList.remove('gpt-comment-highlight');
+            }
+        }
+    }
+
+    // --- Scroll and highlight a specific comment
+    function highlightCommentByText(commentText) {
+        const allReplyButtons = Array.from(document.querySelectorAll('div[role="button"]')).filter(el => el.textContent.trim() === 'Reply');
+        for (const replyBtn of allReplyButtons) {
+            let commentContainer = replyBtn;
+            for (let i = 0; i < 5; i++) {
+                if (commentContainer.parentElement) {
+                    commentContainer = commentContainer.parentElement;
+                } else {
+                    continue;
+                }
+            }
+            if (!commentContainer || !commentContainer.childNodes || !commentContainer.childNodes[0]) continue;
+            const commentBlock = commentContainer.childNodes[0];
+            if (!commentBlock) continue;
+
+            const author = commentBlock.querySelector('a[role="link"]')?.textContent.trim() || 'Unknown';
+            const textBlock = commentBlock.innerText.trim();
+            const text = textBlock
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line =>
+                    line &&
+                    line !== author &&
+                    !/^(Top fan|Author|Like|Reply|Just now|\d+[hm]|·)$/.test(line)
+                )
+                .join(' ');
+            const displayText = `Author: ${author}\n${text}`;
+
+            if (displayText === commentText) {
+                commentContainer.classList.add('gpt-comment-highlight');
+                commentContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+    }
+
     // --- Observe the DOM for dynamic loading of Reply buttons
     function observeReplies() {
         const observer = new MutationObserver(() => {
-            // Finds Reply buttons (EN version, adjust for others)
             const replyButtons = Array.from(document.querySelectorAll('div[role="button"]')).filter(el => el.textContent.trim() === 'Reply');
             replyButtons.forEach(addChatGPTButton);
+            rehighlightAllComments();
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
@@ -259,6 +332,7 @@
         setTimeout(() => {
             const replyButtons = Array.from(document.querySelectorAll('div[role="button"]')).filter(el => el.textContent.trim() === 'Reply');
             replyButtons.forEach(addChatGPTButton);
+            rehighlightAllComments();
         }, 1000);
     }
 
@@ -266,11 +340,17 @@
     createPanel();
     observeReplies();
 
-    // --- Extra: Style for Add Comment button hover (optional)
+    // --- Style for Add Comment button and highlighted comments
     const style = document.createElement('style');
     style.textContent = `
         .gpt-add-comment-btn:hover, .gpt-add-comment-btn:focus {
             background: rgba(49,162,76,0.12) !important;
+        }
+        .gpt-comment-highlight {
+            outline: 2.5px solid #31a24c !important;
+            background: rgba(49,162,76,0.07) !important;
+            border-radius: 8px !important;
+            transition: outline 0.2s, background 0.2s;
         }
     `;
     document.head.appendChild(style);
